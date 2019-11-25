@@ -1,0 +1,99 @@
+image: node:8.16.2-buster-slim
+
+stages:
+  - Prepare-prod
+  - Prepare-dev
+  - Test
+  - Build
+  - Container
+
+prep-prod:npm-install:
+  stage: Prepare-prod
+  only:
+    - tags
+    - merge_requests
+  script:
+    - npm ci --only=production
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+  artifacts:
+    name: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    expire_in: 2h
+    paths:
+      - node_modules/
+
+prep-dev:npm-install-dev:
+  stage: Prepare-dev
+  dependencies:
+    - prep-prod:npm-install
+  only:
+    - tags
+    - merge_requests
+  script:
+    - npm ci
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}_devnpm
+    paths:
+      - node_modules/
+  artifacts:
+    name: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    expire_in: 2h
+    paths:
+      - node_modules/
+
+linting:html-report:
+  stage: Test
+  dependencies:
+    - prep-dev:npm-install-dev
+  only:
+    - tags
+    - merge_requests
+  script:
+    - npm run lint -- --format html --output-file ./eslint-report.html
+  artifacts:
+    name: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    expire_in: 31d
+    when: always
+    paths:
+      - eslint-report.html
+
+linting:audit:
+  stage: Test
+  dependencies:
+    - prep-dev:npm-install-dev
+  only:
+    - tags
+    - merge_requests
+  script:
+    - npm audit || true
+
+build:project:
+  stage: Build
+  only:
+    - tags
+  script:
+    - npm run build
+  dependencies:
+    - prep-dev:npm-install-dev
+  artifacts:
+    name: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    expire_in: 2h
+    paths:
+      - build/
+
+build:container:
+  stage: Container
+  image: docker:18.09.8-dind
+  services:
+    - docker:18.09.8-dind
+  only:
+    - tags
+  dependencies:
+    - prep-prod:npm-install
+    - build:project
+  script:
+    - docker build -f Dockerfile -t ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME} .
+    - docker login -u "gitlab-ci-token" -p "$CI_JOB_TOKEN" $CI_REGISTRY
+    - docker push ${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}

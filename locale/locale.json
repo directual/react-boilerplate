@@ -1,0 +1,12 @@
+{
+  "locale": {
+    "en": {
+      "hello": "Hello world!",
+      "welcome": "Welcome to directual"
+    },
+    "ru": {
+      "hello": "Привет, мир!",
+      "welcome": "Добро пожаловать на directual"
+    }
+  }
+}
