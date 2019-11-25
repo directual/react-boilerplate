@@ -1,1 +1,1 @@
-Hello world
+Directual CRA boilerplate
